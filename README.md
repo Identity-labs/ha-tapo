@@ -39,6 +39,8 @@ Home Assistant custom component for TP-Link Tapo devices, with support for S200B
 ## Supported Devices
 
 - S200B Smart Button
+  - Supports multiple S200B devices connected to the same hub
+  - Each device gets its own sensors and button event detection
 
 ## Requirements
 
@@ -53,9 +55,9 @@ The integration detects button clicks by polling the trigger logs from the S200B
    - `click_type`: `single_click` or `double_click`
    - `event_id`: Unique ID of the event
    - `timestamp`: Unix timestamp of when the button was pressed
-   - `device_id`: Device identifier
+   - `device_id`: Device identifier (allows distinguishing between multiple S200B devices)
 
-2. **Sensor**: A sensor "Tapo Last Button Press" shows the last click type and includes:
+2. **Sensor**: Each S200B device has a sensor showing the last click type (named after the device nickname, e.g., "Bouton Salon Last Button Press") and includes:
    - Last event time (ISO format and readable format)
    - Last event ID
    - Last event type
@@ -66,12 +68,24 @@ You can create automations triggered by button presses:
 
 ```yaml
 automation:
-  - alias: "Single Click Action"
+  - alias: "Single Click Action (All Devices)"
     trigger:
       - platform: event
         event_type: tapo_button_pressed
         event_data:
           click_type: single_click
+    action:
+      - service: light.toggle
+        target:
+          entity_id: light.example
+
+  - alias: "Single Click Action (Specific Device)"
+    trigger:
+      - platform: event
+        event_type: tapo_button_pressed
+        event_data:
+          click_type: single_click
+          device_id: "802E0306A957EED2F9D6EB95824684E2244955F2"  # Your device ID
     action:
       - service: light.toggle
         target:

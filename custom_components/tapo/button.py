@@ -6,9 +6,7 @@ import logging
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -20,29 +18,16 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    api: TapoAPI = entry_data["api"]
-
-    coordinator = TapoButtonCoordinator(hass, api)
-    await coordinator.async_config_entry_first_refresh()
-
-    async_add_entities([TapoButtonSensor(coordinator, entry.entry_id)])
-
-
 class TapoButtonCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass: HomeAssistant, api: TapoAPI) -> None:
+    def __init__(self, hass: HomeAssistant, api: TapoAPI, device_id: str) -> None:
         super().__init__(
             hass,
             _LOGGER,
-            name=f"{DOMAIN}_button_events",
+            name=f"{DOMAIN}_button_events_{device_id}",
             update_interval=timedelta(seconds=2),
         )
         self.api = api
+        self.device_id = device_id
         self._last_processed_id: int | None = None
         self._last_successful_update_time: datetime | None = None
 
@@ -50,9 +35,9 @@ class TapoButtonCoordinator(DataUpdateCoordinator):
         return self._last_successful_update_time
 
     async def _async_update_data(self) -> dict[str, Any]:
-        _LOGGER.debug("Updating button coordinator data")
+        _LOGGER.debug("Updating button coordinator data for device %s", self.device_id)
         try:
-            trigger_logs = await self.api.async_get_trigger_logs(page_size=10, start_id=0)
+            trigger_logs = await self.api.async_get_trigger_logs(device_id=self.device_id, page_size=10, start_id=0)
             if trigger_logs is None:
                 _LOGGER.warning("Failed to get trigger logs, returning empty dict")
                 return {"logs": [], "new_events": [], "last_event": None}
@@ -104,13 +89,13 @@ class TapoButtonCoordinator(DataUpdateCoordinator):
             self.hass.bus.async_fire(
                 f"{DOMAIN}_button_pressed",
                 {
-                    "device_id": self.api._device_id if hasattr(self.api, "_device_id") else None,
+                    "device_id": self.device_id,
                     "click_type": event_type,
                     "event_id": event_id,
                     "timestamp": timestamp,
                 },
             )
-            _LOGGER.info("Fired button event: %s (ID: %s)", event_type, event_id)
+            _LOGGER.info("Fired button event for device %s: %s (ID: %s)", self.device_id, event_type, event_id)
 
 
 class TapoButtonSensor(CoordinatorEntity, SensorEntity):
@@ -118,10 +103,13 @@ class TapoButtonSensor(CoordinatorEntity, SensorEntity):
         self,
         coordinator: TapoButtonCoordinator,
         config_entry_id: str,
+        device_id: str,
+        device_nickname: str,
     ) -> None:
         super().__init__(coordinator)
-        self._attr_name = "Tapo Last Button Press"
-        self._attr_unique_id = f"{config_entry_id}_last_button_press"
+        self._device_id = device_id
+        self._attr_name = f"{device_nickname} Last Button Press"
+        self._attr_unique_id = f"{config_entry_id}_{device_id}_last_button_press"
 
     @property
     def native_value(self) -> str | None:

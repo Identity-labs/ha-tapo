@@ -100,34 +100,52 @@ class TapoAPI:
         return result
 
     async def async_get_device_info(self) -> dict[str, Any] | None:
-        if not self._authenticated or not self._device:
+        if not self._authenticated or not self._hub:
             _LOGGER.info("Not authenticated, authenticating...")
             if not await self.async_authenticate():
                 _LOGGER.error("Authentication failed, cannot get device info")
                 return None
 
         try:
-            return self._extract_device_data(self._device)
+            if not self._hub:
+                return None
+            
+            child_devices = await self._hub.get_child_device_list()
+            if not child_devices:
+                return None
+            
+            current_device = child_devices[0]
+            return self._extract_device_data(current_device)
         except Exception as err:
             _LOGGER.error("Failed to get device info: %s", err, exc_info=True)
             self._authenticated = False
             return None
 
     async def async_get_battery_status(self) -> dict[str, Any] | None:
-        if not self._authenticated or not self._device:
+        if not self._authenticated or not self._hub:
             _LOGGER.info("Not authenticated, authenticating...")
             if not await self.async_authenticate():
                 _LOGGER.error("Authentication failed, cannot get battery status")
                 return None
 
         try:
-            device_data = self._extract_device_data(self._device)
+            if not self._hub:
+                return None
+            
+            child_devices = await self._hub.get_child_device_list()
+            if not child_devices:
+                return None
+            
+            current_device = child_devices[0]
+            device_data = self._extract_device_data(current_device)
             result: dict[str, Any] = {}
             
             if "battery_percentage" in device_data:
                 result["battery_percentage"] = device_data["battery_percentage"]
             if "battery_low" in device_data:
                 result["battery_low"] = device_data["battery_low"]
+            if "at_low_battery" in device_data:
+                result["at_low_battery"] = device_data["at_low_battery"]
             
             return result if result else None
         except Exception as err:
@@ -135,34 +153,71 @@ class TapoAPI:
             self._authenticated = False
             return None
 
-    async def async_get_sensor_data(self) -> dict[str, Any] | None:
-        if not self._authenticated or not self._device:
+    async def async_get_all_child_devices(self) -> list[dict[str, Any]] | None:
+        """Get all child devices from the hub."""
+        if not self._authenticated or not self._hub:
+            _LOGGER.info("Not authenticated, authenticating...")
+            if not await self.async_authenticate():
+                _LOGGER.error("Authentication failed, cannot get child devices")
+                return None
+
+        try:
+            if not self._hub:
+                _LOGGER.error("Hub not available")
+                return None
+            
+            child_devices = await self._hub.get_child_device_list()
+            if not child_devices:
+                _LOGGER.warning("No child devices found")
+                return None
+            
+            devices_data = []
+            for device in child_devices:
+                device_data = self._extract_device_data(device)
+                if device_data:
+                    devices_data.append(device_data)
+            
+            return devices_data if devices_data else None
+        except Exception as err:
+            _LOGGER.error("Failed to get child devices: %s", err, exc_info=True)
+            return None
+
+    async def async_get_sensor_data(self, device_id: str | None = None) -> dict[str, Any] | None:
+        """Get sensor data for a specific device or the first device if device_id is None."""
+        if not self._authenticated or not self._hub:
             _LOGGER.info("Not authenticated, authenticating...")
             if not await self.async_authenticate():
                 _LOGGER.error("Authentication failed, cannot get sensor data")
                 return None
 
         try:
-            sensor_data: dict[str, Any] = {}
-            
             if not self._hub:
                 _LOGGER.error("Hub not available")
                 return None
             
             child_devices = await self._hub.get_child_device_list()
-            if child_devices:
+            if not child_devices:
+                _LOGGER.warning("No child devices found")
+                return None
+            
+            if device_id:
+                for device in child_devices:
+                    if hasattr(device, "device_id") and device.device_id == device_id:
+                        device_data = self._extract_device_data(device)
+                        return device_data if device_data else None
+                _LOGGER.warning("Device %s not found", device_id)
+                return None
+            else:
                 current_device = child_devices[0]
                 device_data = self._extract_device_data(current_device)
-                sensor_data.update(device_data)
-            
-            return sensor_data if sensor_data else None
+                return device_data if device_data else None
         except Exception as err:
             _LOGGER.error("Failed to get sensor data: %s", err, exc_info=True)
             return None
     
     async def async_get_trigger_logs(
-        self, page_size: int = 20, start_id: int = 0
-    ) -> list[dict[str, Any]] | None:
+        self, device_id: str | None = None, page_size: int = 20, start_id: int = 0
+    ) -> dict[str, Any] | None:
         """Get trigger logs from S200B device - contains button click events.
         
         Args:
@@ -179,14 +234,13 @@ class TapoAPI:
                 return None
 
         try:
-            if not self._s200b_handler:
-                if self._device_id and self._hub:
-                    self._s200b_handler = await self._hub.s200b(self._device_id)
-                else:
-                    _LOGGER.warning("S200B handler not available")
-                    return None
+            target_device_id = device_id or self._device_id
+            if not target_device_id or not self._hub:
+                _LOGGER.warning("S200B handler not available (device_id: %s)", target_device_id)
+                return None
             
-            trigger_logs = await self._s200b_handler.get_trigger_logs(
+            s200b_handler = await self._hub.s200b(target_device_id)
+            trigger_logs = await s200b_handler.get_trigger_logs(
                 page_size=page_size, start_id=start_id
             )
             
