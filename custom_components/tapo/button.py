@@ -24,7 +24,7 @@ class TapoButtonCoordinator(DataUpdateCoordinator):
             hass,
             _LOGGER,
             name=f"{DOMAIN}_button_events_{device_id}",
-            update_interval=timedelta(seconds=2),
+            update_interval=timedelta(seconds=1),
         )
         self.api = api
         self.device_id = device_id

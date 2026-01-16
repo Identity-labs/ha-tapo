@@ -12,7 +12,7 @@
       }
     },
     "error": {
-      "cannot_connect": "Unable to connect to Tapo device. Please check your network connection and device IP address.",
+      "cannot_connect": "Unable to connect to Tapo device hub (H100). Please check your network connection and device IP address.",
       "invalid_auth": "Invalid credentials. Please check your username and password.",
       "unknown": "Unexpected error occurred"
     },
