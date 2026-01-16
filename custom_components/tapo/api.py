@@ -253,8 +253,23 @@ class TapoAPI:
                         "id": getattr(log_entry, "id", None),
                         "timestamp": getattr(log_entry, "timestamp", None),
                     }
+                    
+                    if hasattr(log_entry, "params"):
+                        params = log_entry.params
+                        if hasattr(params, "rotation_degrees"):
+                            log_dict["rotation_degrees"] = params.rotation_degrees
+                        elif hasattr(params, "__dict__"):
+                            for key, value in params.__dict__.items():
+                                log_dict[f"params_{key}"] = value
+                    
                     if hasattr(log_entry, "__dict__"):
-                        log_dict.update(log_entry.__dict__)
+                        for key, value in log_entry.__dict__.items():
+                            if key not in log_dict and key != "params":
+                                log_dict[key] = value
+                            elif key == "params" and hasattr(value, "__dict__"):
+                                for param_key, param_value in value.__dict__.items():
+                                    log_dict[f"params_{param_key}"] = param_value
+                    
                     logs_list.append(log_dict)
             elif hasattr(trigger_logs, "__iter__") and not isinstance(trigger_logs, str):
                 for log_entry in trigger_logs:

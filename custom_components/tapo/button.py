@@ -81,13 +81,46 @@ class TapoButtonCoordinator(DataUpdateCoordinator):
             event_id = event.get("id")
             
             click_type_lower = click_type.lower()
+            event_data: dict[str, Any] = {
+                "device_id": self.device_id,
+                "event_id": event_id,
+                "timestamp": timestamp,
+            }
+            
             if "single" in click_type_lower and "click" in click_type_lower:
                 event_type = "single_click"
             elif "double" in click_type_lower and "click" in click_type_lower:
                 event_type = "double_click"
+            elif "rotate" in click_type_lower or "rotation" in click_type_lower:
+                rotation_degrees = event.get("rotation_degrees") or event.get("params_rotation_degrees")
+                if rotation_degrees is not None:
+                    if rotation_degrees > 0:
+                        direction = "right"
+                    elif rotation_degrees < 0:
+                        direction = "left"
+                    else:
+                        direction = "unknown"
+                    event_type = f"rotate_{direction}"
+                    event_data["rotation_degrees"] = abs(rotation_degrees)
+                    event_data["direction"] = direction
+                else:
+                    direction = "unknown"
+                    if "left" in click_type_lower or "counterclockwise" in click_type_lower or "ccw" in click_type_lower:
+                        direction = "left"
+                    elif "right" in click_type_lower or "clockwise" in click_type_lower or "cw" in click_type_lower:
+                        direction = "right"
+                    event_type = f"rotate_{direction}"
             else:
-                event_type = click_type.lower().replace("click", "_click")
-                _LOGGER.warning("Unknown click type: %s, using: %s", click_type, event_type)
+                event_type = click_type.lower().replace("click", "_click").replace("_", "_")
+                _LOGGER.info("Detected event type: %s (original: %s)", event_type, click_type)
+            
+            event_data["click_type"] = event_type
+            
+            self.hass.bus.async_fire(
+                f"{DOMAIN}_button_pressed",
+                event_data,
+            )
+            _LOGGER.info("Fired button event for device %s: %s (ID: %s)", self.device_id, event_type, event_id)
             
             self.hass.bus.async_fire(
                 f"{DOMAIN}_button_pressed",
@@ -124,6 +157,23 @@ class TapoButtonSensor(CoordinatorEntity, SensorEntity):
                 return "Single Click"
             elif "double" in click_type_lower and "click" in click_type_lower:
                 return "Double Click"
+            elif "rotate" in click_type_lower or "rotation" in click_type_lower:
+                rotation_degrees = last_event.get("rotation_degrees") or last_event.get("params_rotation_degrees")
+                if rotation_degrees is not None:
+                    if rotation_degrees > 0:
+                        direction = "Right"
+                    elif rotation_degrees < 0:
+                        direction = "Left"
+                    else:
+                        direction = "Unknown"
+                    return f"Rotate {direction} ({abs(rotation_degrees)}°)"
+                else:
+                    direction = "Unknown"
+                    if "left" in click_type_lower or "counterclockwise" in click_type_lower or "ccw" in click_type_lower:
+                        direction = "Left"
+                    elif "right" in click_type_lower or "clockwise" in click_type_lower or "cw" in click_type_lower:
+                        direction = "Right"
+                    return f"Rotate {direction}"
             else:
                 return click_type.replace("Click", " Click").replace("_", " ").title()
         return None
@@ -145,6 +195,10 @@ class TapoButtonSensor(CoordinatorEntity, SensorEntity):
                 attrs["last_event_time_readable"] = dt.strftime("%Y-%m-%d %H:%M:%S")
             attrs["last_event_id"] = last_event.get("id")
             attrs["last_event_type"] = last_event.get("click_type")
+            rotation_degrees = last_event.get("rotation_degrees") or last_event.get("params_rotation_degrees")
+            if rotation_degrees is not None:
+                attrs["last_rotation_degrees"] = abs(rotation_degrees)
+                attrs["last_rotation_direction"] = "right" if rotation_degrees > 0 else "left" if rotation_degrees < 0 else "unknown"
         
         return attrs
 

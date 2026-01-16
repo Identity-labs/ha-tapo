@@ -1,0 +1,242 @@
+# Example automations for Tapo S200B button presses
+# Copy these to your Home Assistant automations.yaml or create them via the UI
+
+# Example 1: Toggle a light with single click (all devices)
+- id: tapo_single_click_toggle_light
+  alias: "Tapo Single Click - Toggle Light"
+  description: "Toggle a light when any S200B button is single-clicked"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: single_click
+  action:
+    - service: light.toggle
+      target:
+        entity_id: light.living_room
+  mode: single
+
+# Example 2: Single click for a specific device
+- id: tapo_single_click_specific_device
+  alias: "Tapo Single Click - Specific Device"
+  description: "Toggle light only when a specific S200B button is clicked"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: single_click
+        device_id: "802E0306A957EED2F9D6EB95824684E2244955F2"  # Replace with your device ID
+  action:
+    - service: light.toggle
+      target:
+        entity_id: light.living_room
+  mode: single
+
+# Example 3: Double click to activate a scene
+- id: tapo_double_click_scene
+  alias: "Tapo Double Click - Activate Scene"
+  description: "Activate a scene when button is double-clicked"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: double_click
+  action:
+    - service: scene.turn_on
+      target:
+        entity_id: scene.evening_mode
+  mode: single
+
+# Example 4: Single click to turn on, double click to turn off
+- id: tapo_single_click_turn_on
+  alias: "Tapo Single Click - Turn On"
+  description: "Turn on lights with single click"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: single_click
+  action:
+    - service: light.turn_on
+      target:
+        entity_id: 
+          - light.living_room
+          - light.kitchen
+      data:
+        brightness: 255
+  mode: single
+
+- id: tapo_double_click_turn_off
+  alias: "Tapo Double Click - Turn Off"
+  description: "Turn off lights with double click"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: double_click
+  action:
+    - service: light.turn_off
+      target:
+        entity_id: 
+          - light.living_room
+          - light.kitchen
+  mode: single
+
+# Example 5: Control different devices based on which button was pressed
+- id: tapo_button_salon_single_click
+  alias: "Tapo Bouton Salon - Single Click"
+  description: "Control living room when 'Bouton Salon' is clicked"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: single_click
+        device_id: "802E0306A957EED2F9D6EB95824684E2244955F2"  # Device ID for "Bouton Salon"
+  action:
+    - service: light.toggle
+      target:
+        entity_id: light.living_room
+  mode: single
+
+- id: tapo_button_salle_manger_single_click
+  alias: "Tapo Bouton Salle à Manger - Single Click"
+  description: "Control kitchen when 'Bouton Salle à Manger' is clicked"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: single_click
+        device_id: "802EDABF0113537EB7F4D9677DB2E3A42449E4BA"  # Device ID for "Bouton Salle à Manger"
+  action:
+    - service: light.toggle
+      target:
+        entity_id: light.kitchen
+  mode: single
+
+# Example 6: Send notification when button is pressed
+- id: tapo_button_notification
+  alias: "Tapo Button - Notification"
+  description: "Send a notification when button is pressed"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+  action:
+    - service: notify.mobile_app_your_phone  # Replace with your notification service
+      data:
+        title: "Tapo Button Pressed"
+        message: >
+          {{ trigger.event.data.click_type }} detected
+          Device: {{ trigger.event.data.device_id }}
+  mode: single
+
+# Example 7: Rotate left/right to control brightness or volume
+- id: tapo_rotate_left
+  alias: "Tapo Rotate Left - Decrease Brightness"
+  description: "Decrease light brightness when button is rotated left"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_left
+  action:
+    - service: light.turn_on
+      target:
+        entity_id: light.living_room
+      data:
+        brightness_step: -25
+  mode: single
+
+- id: tapo_rotate_right
+  alias: "Tapo Rotate Right - Increase Brightness"
+  description: "Increase light brightness when button is rotated right"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_right
+  action:
+    - service: light.turn_on
+      target:
+        entity_id: light.living_room
+      data:
+        brightness_step: 25
+  mode: single
+
+# Example 8: Use rotation degrees for precise control
+- id: tapo_rotate_with_degrees
+  alias: "Tapo Rotate - Adjust by Degrees"
+  description: "Adjust brightness based on rotation degrees"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_left
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_right
+  action:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'rotate_right' }}"
+          sequence:
+            - service: light.turn_on
+              target:
+                entity_id: light.living_room
+              data:
+                brightness: >
+                  {% set current = states.light.living_room.attributes.brightness | default(0) %}
+                  {% set degrees = trigger.event.data.rotation_degrees | default(30) %}
+                  {{ [255, current + (degrees * 2)] | min }}
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'rotate_left' }}"
+          sequence:
+            - service: light.turn_on
+              target:
+                entity_id: light.living_room
+              data:
+                brightness: >
+                  {% set current = states.light.living_room.attributes.brightness | default(255) %}
+                  {% set degrees = trigger.event.data.rotation_degrees | default(30) %}
+                  {{ [0, current - (degrees * 2)] | max }}
+  mode: single
+
+# Example 9: Use button to control media player
+- id: tapo_button_media_control
+  alias: "Tapo Button - Media Control"
+  description: "Control media player with button clicks"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: single_click
+  action:
+    - choose:
+        - conditions:
+            - condition: state
+              entity_id: media_player.living_room
+              state: "playing"
+          sequence:
+            - service: media_player.media_pause
+              target:
+                entity_id: media_player.living_room
+        - conditions:
+            - condition: state
+              entity_id: media_player.living_room
+              state: "paused"
+          sequence:
+            - service: media_player.media_play
+              target:
+                entity_id: media_player.living_room
+        - conditions:
+            - condition: state
+              entity_id: media_player.living_room
+              state: "idle"
+          sequence:
+            - service: media_player.media_play
+              target:
+                entity_id: media_player.living_room
+  mode: single
+

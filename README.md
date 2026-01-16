@@ -47,20 +47,22 @@ Home Assistant custom component for TP-Link Tapo devices, with support for S200B
 - Home Assistant 2023.1 or later
 - Tapo Python library (installed automatically)
 
-## Button Click Detection
+## Button Click and Rotation Detection
 
-The integration detects button clicks by polling the trigger logs from the S200B device. When a button is pressed:
+The integration detects button clicks and rotations by polling the trigger logs from the S200B device. When a button is pressed or rotated:
 
 1. **Home Assistant Event**: An event `tapo_button_pressed` is fired with:
-   - `click_type`: `single_click` or `double_click`
+   - `click_type`: `single_click`, `double_click`, `rotate_left`, `rotate_right`, or `rotate_left_<angle>`, `rotate_right_<angle>` (if angle is available)
    - `event_id`: Unique ID of the event
-   - `timestamp`: Unix timestamp of when the button was pressed
+   - `timestamp`: Unix timestamp of when the button was pressed/rotated
    - `device_id`: Device identifier (allows distinguishing between multiple S200B devices)
+   - `angle` or `steps` or `value`: (optional) Rotation angle/steps if available
 
-2. **Sensor**: Each S200B device has a sensor showing the last click type (named after the device nickname, e.g., "Bouton Salon Last Button Press") and includes:
+2. **Sensor**: Each S200B device has a sensor showing the last event type (named after the device nickname, e.g., "Bouton Salon Last Button Press") and includes:
    - Last event time (ISO format and readable format)
    - Last event ID
-   - Last event type
+   - Last event type (click or rotation)
+   - Last rotation degrees and direction (for rotation events)
 
 ### Using Button Events in Automations
 
@@ -103,9 +105,17 @@ automation:
           entity_id: scene.example
 ```
 
+## Rotation Events
+
+The S200B button supports rotation events. If rotation events are available in the trigger logs, they will be detected and fired as `tapo_button_pressed` events with:
+- `click_type`: `rotate_left` or `rotate_right`
+- Additional data: `angle`, `steps`, or `value` (if available)
+
+**Note**: Rotation events depend on the device firmware and may not be available in all trigger logs. If you don't see rotation events, they may not be supported by your device firmware version.
+
 ## Notes
 
-The integration polls trigger logs every 2 seconds to detect button presses. This provides near real-time detection of single and double clicks.
+The integration polls trigger logs every 1 second to detect button presses and rotations. This provides near real-time detection of single clicks, double clicks, and rotation events.
 
 ## Credits
 
