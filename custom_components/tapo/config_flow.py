@@ -10,7 +10,11 @@ from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.data_entry_flow import FlowResult
 
 from .api import TapoAPI
-from .const import DOMAIN
+from .const import (
+    CONF_EVENT_POLL_INTERVAL,
+    DEFAULT_EVENT_POLL_INTERVAL,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,6 +23,11 @@ DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
         vol.Required(CONF_HOST): str,
+        vol.Optional(
+            CONF_EVENT_POLL_INTERVAL,
+            default=DEFAULT_EVENT_POLL_INTERVAL,
+            description="Event polling interval in seconds (0.5-10)",
+        ): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=10.0)),
     }
 )
 
@@ -27,6 +36,11 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Required(CONF_USERNAME): str,
         vol.Required(CONF_PASSWORD): str,
         vol.Required(CONF_HOST): str,
+        vol.Optional(
+            CONF_EVENT_POLL_INTERVAL,
+            default=DEFAULT_EVENT_POLL_INTERVAL,
+            description="Event polling interval in seconds (0.5-10)",
+        ): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=10.0)),
     }
 )
 
@@ -132,6 +146,13 @@ class TapoOptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_HOST,
                         default=config_entry.data.get(CONF_HOST),
                     ): str,
+                    vol.Optional(
+                        CONF_EVENT_POLL_INTERVAL,
+                        default=config_entry.data.get(
+                            CONF_EVENT_POLL_INTERVAL, DEFAULT_EVENT_POLL_INTERVAL
+                        ),
+                        description="Event polling interval in seconds (0.5-10)",
+                    ): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=10.0)),
                 }
             ),
             errors=errors,

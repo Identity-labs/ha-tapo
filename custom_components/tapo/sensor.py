@@ -15,7 +15,7 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .api import TapoAPI
-from .const import DOMAIN
+from .const import CONF_EVENT_POLL_INTERVAL, DEFAULT_EVENT_POLL_INTERVAL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -198,7 +198,8 @@ async def async_setup_entry(
                 )
             
             from .button import TapoButtonCoordinator, TapoButtonSensor
-            button_coordinator = TapoButtonCoordinator(hass, api, device_id)
+            poll_interval = entry.options.get(CONF_EVENT_POLL_INTERVAL) or entry.data.get(CONF_EVENT_POLL_INTERVAL, DEFAULT_EVENT_POLL_INTERVAL)
+            button_coordinator = TapoButtonCoordinator(hass, api, device_id, poll_interval=poll_interval)
             await button_coordinator.async_config_entry_first_refresh()
             sensors.append(TapoButtonSensor(button_coordinator, entry.entry_id, device_id, device_nickname))
 

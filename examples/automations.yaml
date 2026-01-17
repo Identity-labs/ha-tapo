@@ -597,3 +597,245 @@
               target:
                 entity_id: input_number.brightness_level
   mode: single
+
+# ============================================================================
+# PHILIPS HUE EXAMPLES
+# ============================================================================
+
+# Example 19: Rotate to adjust Hue light brightness using brightness_step
+# brightness_step: Adjusts brightness relative to current value (-255 to +255)
+# This is the recommended method for smooth brightness control
+- id: tapo_rotate_hue_brightness_up
+  alias: "Tapo Rotate Right - Increase Hue Brightness"
+  description: "Increase Philips Hue light brightness when rotated right (using brightness_step)"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_right
+  action:
+    - service: light.turn_on
+      target:
+        entity_id: light.hue_living_room  # Replace with your Hue light entity
+      data:
+        brightness_step: 25  # Increases brightness by 25 points (0-255 scale)
+  mode: single
+
+- id: tapo_rotate_hue_brightness_down
+  alias: "Tapo Rotate Left - Decrease Hue Brightness"
+  description: "Decrease Philips Hue light brightness when rotated left (using brightness_step)"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_left
+  action:
+    - service: light.turn_on
+      target:
+        entity_id: light.hue_living_room  # Replace with your Hue light entity
+      data:
+        brightness_step: -25  # Decreases brightness by 25 points (0-255 scale)
+  mode: single
+
+# Example 19b: Rotate to adjust Hue brightness using brightness_step_pct (percentage-based)
+# brightness_step_pct: Adjusts brightness relative to current value in percentage (-100 to +100)
+# Alternative method using percentage, may be more intuitive
+- id: tapo_rotate_hue_brightness_up_pct
+  alias: "Tapo Rotate Right - Increase Hue Brightness (Percentage)"
+  description: "Increase Hue brightness using percentage steps"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_right
+  action:
+    - service: light.turn_on
+      target:
+        entity_id: light.hue_living_room
+      data:
+        brightness_step_pct: 10  # Increases brightness by 10% of max
+  mode: single
+
+- id: tapo_rotate_hue_brightness_down_pct
+  alias: "Tapo Rotate Left - Decrease Hue Brightness (Percentage)"
+  description: "Decrease Hue brightness using percentage steps"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_left
+  action:
+    - service: light.turn_on
+      target:
+        entity_id: light.hue_living_room
+      data:
+        brightness_step_pct: -10  # Decreases brightness by 10% of max
+  mode: single
+
+# Example 20: Rotate to adjust Hue brightness with precise control using degrees
+- id: tapo_rotate_hue_brightness_precise
+  alias: "Tapo Rotate - Precise Hue Brightness Control"
+  description: "Adjust Hue brightness based on rotation degrees (more precise)"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_right
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_left
+  action:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'rotate_right' }}"
+          sequence:
+            - service: light.turn_on
+              target:
+                entity_id: light.hue_living_room  # Replace with your Hue light entity
+              data:
+                brightness: >
+                  {% set current = states.light.hue_living_room.attributes.brightness | default(0) %}
+                  {% set degrees = trigger.event.data.rotation_degrees | default(30) %}
+                  {{ [255, current + (degrees * 2)] | min }}
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'rotate_left' }}"
+          sequence:
+            - service: light.turn_on
+              target:
+                entity_id: light.hue_living_room  # Replace with your Hue light entity
+              data:
+                brightness: >
+                  {% set current = states.light.hue_living_room.attributes.brightness | default(255) %}
+                  {% set degrees = trigger.event.data.rotation_degrees | default(30) %}
+                  {{ [0, current - (degrees * 2)] | max }}
+  mode: single
+
+# Example 21: Complete Hue control - Click to toggle, rotate to adjust brightness
+- id: tapo_complete_hue_control
+  alias: "Tapo Complete Hue Light Control"
+  description: "Single click toggles Hue light, double click turns off, rotate adjusts brightness"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+  action:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'single_click' }}"
+          sequence:
+            - service: light.toggle
+              target:
+                entity_id: light.hue_living_room  # Replace with your Hue light entity
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'double_click' }}"
+          sequence:
+            - service: light.turn_off
+              target:
+                entity_id: light.hue_living_room  # Replace with your Hue light entity
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'rotate_right' }}"
+          sequence:
+            - service: light.turn_on
+              target:
+                entity_id: light.hue_living_room  # Replace with your Hue light entity
+              data:
+                brightness_step: 30
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'rotate_left' }}"
+          sequence:
+            - service: light.turn_on
+              target:
+                entity_id: light.hue_living_room  # Replace with your Hue light entity
+              data:
+                brightness_step: -30
+  mode: single
+
+# Example 22: Rotate to adjust multiple Hue lights brightness
+- id: tapo_rotate_hue_multiple_lights
+  alias: "Tapo Rotate - Multiple Hue Lights Brightness"
+  description: "Adjust brightness of multiple Hue lights simultaneously"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_right
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_left
+  action:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'rotate_right' }}"
+          sequence:
+            - service: light.turn_on
+              target:
+                entity_id:
+                  - light.hue_living_room
+                  - light.hue_kitchen
+                  - light.hue_bedroom
+              data:
+                brightness_step: 25
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'rotate_left' }}"
+          sequence:
+            - service: light.turn_on
+              target:
+                entity_id:
+                  - light.hue_living_room
+                  - light.hue_kitchen
+                  - light.hue_bedroom
+              data:
+                brightness_step: -25
+  mode: single
+
+# Example 23: Rotate to adjust Hue light brightness percentage
+- id: tapo_rotate_hue_brightness_percentage
+  alias: "Tapo Rotate - Hue Brightness Percentage"
+  description: "Adjust Hue brightness as percentage (0-100%)"
+  trigger:
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_right
+    - platform: event
+      event_type: tapo_button_pressed
+      event_data:
+        click_type: rotate_left
+  action:
+    - choose:
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'rotate_right' }}"
+          sequence:
+            - service: light.turn_on
+              target:
+                entity_id: light.hue_living_room  # Replace with your Hue light entity
+              data:
+                brightness_pct: >
+                  {% set current = states.light.hue_living_room.attributes.brightness | default(0) %}
+                  {% set current_pct = (current / 255 * 100) | round(0) | int %}
+                  {% set degrees = trigger.event.data.rotation_degrees | default(30) %}
+                  {{ [100, current_pct + (degrees / 30 * 5)] | min | int }}
+        - conditions:
+            - condition: template
+              value_template: "{{ trigger.event.data.click_type == 'rotate_left' }}"
+          sequence:
+            - service: light.turn_on
+              target:
+                entity_id: light.hue_living_room  # Replace with your Hue light entity
+              data:
+                brightness_pct: >
+                  {% set current = states.light.hue_living_room.attributes.brightness | default(255) %}
+                  {% set current_pct = (current / 255 * 100) | round(0) | int %}
+                  {% set degrees = trigger.event.data.rotation_degrees | default(30) %}
+                  {{ [0, current_pct - (degrees / 30 * 5)] | max | int }}
+  mode: single

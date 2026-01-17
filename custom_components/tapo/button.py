@@ -19,12 +19,12 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class TapoButtonCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass: HomeAssistant, api: TapoAPI, device_id: str) -> None:
+    def __init__(self, hass: HomeAssistant, api: TapoAPI, device_id: str, poll_interval: float = 1.0) -> None:
         super().__init__(
             hass,
             _LOGGER,
             name=f"{DOMAIN}_button_events_{device_id}",
-            update_interval=timedelta(seconds=1),
+            update_interval=timedelta(seconds=poll_interval),
         )
         self.api = api
         self.device_id = device_id
