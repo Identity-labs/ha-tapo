@@ -215,6 +215,68 @@ class TapoAPI:
             _LOGGER.error("Failed to get sensor data: %s", err, exc_info=True)
             return None
     
+    def _parse_trigger_logs(self, trigger_logs: Any) -> dict[str, Any] | None:
+        """Parse trigger logs response into a dictionary format.
+        
+        Args:
+            trigger_logs: Raw trigger logs response from the API
+            
+        Returns:
+            Dictionary with parsed logs, start_id, and sum, or None if parsing fails
+        """
+        logs_list: list[dict[str, Any]] = []
+        
+        if hasattr(trigger_logs, "logs") and trigger_logs.logs:
+            for log_entry in trigger_logs.logs:
+                log_dict: dict[str, Any] = {
+                    "click_type": type(log_entry).__name__,
+                    "id": getattr(log_entry, "id", None),
+                    "timestamp": getattr(log_entry, "timestamp", None),
+                }
+                
+                if hasattr(log_entry, "params"):
+                    params = log_entry.params
+                    if hasattr(params, "rotation_degrees"):
+                        log_dict["rotation_degrees"] = params.rotation_degrees
+                    elif hasattr(params, "__dict__"):
+                        for key, value in params.__dict__.items():
+                            log_dict[f"params_{key}"] = value
+                
+                if hasattr(log_entry, "__dict__"):
+                    for key, value in log_entry.__dict__.items():
+                        if key not in log_dict and key != "params":
+                            log_dict[key] = value
+                        elif key == "params" and hasattr(value, "__dict__"):
+                            for param_key, param_value in value.__dict__.items():
+                                log_dict[f"params_{param_key}"] = param_value
+                
+                logs_list.append(log_dict)
+        elif hasattr(trigger_logs, "__iter__") and not isinstance(trigger_logs, str):
+            for log_entry in trigger_logs:
+                log_dict: dict[str, Any] = {}
+                if hasattr(log_entry, "__dict__"):
+                    log_dict.update(log_entry.__dict__)
+                elif hasattr(log_entry, "to_dict"):
+                    log_dict.update(log_entry.to_dict())
+                else:
+                    log_dict["raw"] = str(log_entry)
+                logs_list.append(log_dict)
+        elif hasattr(trigger_logs, "__dict__"):
+            logs_list.append(trigger_logs.__dict__)
+        elif hasattr(trigger_logs, "to_dict"):
+            logs_list.append(trigger_logs.to_dict())
+        else:
+            _LOGGER.warning("Unexpected trigger logs format: %s", type(trigger_logs))
+            return None
+        
+        result: dict[str, Any] = {
+            "logs": logs_list,
+            "start_id": getattr(trigger_logs, "start_id", None),
+            "sum": getattr(trigger_logs, "sum", None),
+        }
+        
+        return result
+    
     async def async_get_trigger_logs(
         self, device_id: str | None = None, page_size: int = 20, start_id: int = 0
     ) -> dict[str, Any] | None:
@@ -244,61 +306,50 @@ class TapoAPI:
                 page_size=page_size, start_id=start_id
             )
             
-            logs_list: list[dict[str, Any]] = []
-            
-            if hasattr(trigger_logs, "logs") and trigger_logs.logs:
-                for log_entry in trigger_logs.logs:
-                    log_dict: dict[str, Any] = {
-                        "click_type": type(log_entry).__name__,
-                        "id": getattr(log_entry, "id", None),
-                        "timestamp": getattr(log_entry, "timestamp", None),
-                    }
-                    
-                    if hasattr(log_entry, "params"):
-                        params = log_entry.params
-                        if hasattr(params, "rotation_degrees"):
-                            log_dict["rotation_degrees"] = params.rotation_degrees
-                        elif hasattr(params, "__dict__"):
-                            for key, value in params.__dict__.items():
-                                log_dict[f"params_{key}"] = value
-                    
-                    if hasattr(log_entry, "__dict__"):
-                        for key, value in log_entry.__dict__.items():
-                            if key not in log_dict and key != "params":
-                                log_dict[key] = value
-                            elif key == "params" and hasattr(value, "__dict__"):
-                                for param_key, param_value in value.__dict__.items():
-                                    log_dict[f"params_{param_key}"] = param_value
-                    
-                    logs_list.append(log_dict)
-            elif hasattr(trigger_logs, "__iter__") and not isinstance(trigger_logs, str):
-                for log_entry in trigger_logs:
-                    log_dict: dict[str, Any] = {}
-                    if hasattr(log_entry, "__dict__"):
-                        log_dict.update(log_entry.__dict__)
-                    elif hasattr(log_entry, "to_dict"):
-                        log_dict.update(log_entry.to_dict())
-                    else:
-                        log_dict["raw"] = str(log_entry)
-                    logs_list.append(log_dict)
-            elif hasattr(trigger_logs, "__dict__"):
-                logs_list.append(trigger_logs.__dict__)
-            elif hasattr(trigger_logs, "to_dict"):
-                logs_list.append(trigger_logs.to_dict())
-            else:
-                _LOGGER.warning("Unexpected trigger logs format: %s", type(trigger_logs))
-                return None
-            
-            result: dict[str, Any] = {
-                "logs": logs_list,
-                "start_id": getattr(trigger_logs, "start_id", None),
-                "sum": getattr(trigger_logs, "sum", None),
-            }
-            
-            return result
+            return self._parse_trigger_logs(trigger_logs)
         except Exception as err:
-            _LOGGER.error("Failed to get trigger logs: %s", err, exc_info=True)
-            return None
+            error_str = str(err)
+            is_connection_error = (
+                "Connection reset" in error_str
+                or "Connection refused" in error_str
+                or "Connection closed" in error_str
+                or "Connection reset by peer" in error_str
+                or "Http" in str(type(err).__name__)
+            )
+            
+            if is_connection_error:
+                _LOGGER.warning(
+                    "Connection error while getting trigger logs (device_id: %s): %s. Attempting to re-authenticate...",
+                    target_device_id,
+                    error_str,
+                )
+                self._authenticated = False
+                self._hub = None
+                self._s200b_handler = None
+                
+                if await self.async_authenticate():
+                    _LOGGER.info("Re-authentication successful, retrying trigger logs request...")
+                    try:
+                        target_device_id = device_id or self._device_id
+                        if target_device_id and self._hub:
+                            s200b_handler = await self._hub.s200b(target_device_id)
+                            trigger_logs = await s200b_handler.get_trigger_logs(
+                                page_size=page_size, start_id=start_id
+                            )
+                            
+                            result = self._parse_trigger_logs(trigger_logs)
+                            if result:
+                                _LOGGER.info("Successfully retrieved trigger logs after re-authentication")
+                            return result
+                    except Exception as retry_err:
+                        _LOGGER.error("Failed to get trigger logs after re-authentication: %s", retry_err, exc_info=True)
+                        return None
+                else:
+                    _LOGGER.error("Re-authentication failed after connection error")
+                    return None
+            else:
+                _LOGGER.error("Failed to get trigger logs: %s", err, exc_info=True)
+                return None
 
     def get_last_successful_auth_time(self) -> datetime | None:
         return self._last_successful_auth_time
