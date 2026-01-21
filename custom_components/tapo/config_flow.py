@@ -26,8 +26,8 @@ DATA_SCHEMA = vol.Schema(
         vol.Optional(
             CONF_EVENT_POLL_INTERVAL,
             default=DEFAULT_EVENT_POLL_INTERVAL,
-            description="Event polling interval in seconds (0.5-10)",
-        ): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=10.0)),
+            description="Event polling interval in seconds (0.1-10)",
+        ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=10.0)),
     }
 )
 
@@ -39,8 +39,8 @@ OPTIONS_SCHEMA = vol.Schema(
         vol.Optional(
             CONF_EVENT_POLL_INTERVAL,
             default=DEFAULT_EVENT_POLL_INTERVAL,
-            description="Event polling interval in seconds (0.5-10)",
-        ): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=10.0)),
+            description="Event polling interval in seconds (0.1-10)",
+        ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=10.0)),
     }
 )
 
@@ -169,8 +169,8 @@ class TapoOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Optional(
                         CONF_EVENT_POLL_INTERVAL,
                         default=event_poll_interval,
-                        description="Event polling interval in seconds (0.5-10)",
-                    ): vol.All(vol.Coerce(float), vol.Range(min=0.5, max=10.0)),
+                        description="Event polling interval in seconds (0.1-10)",
+                    ): vol.All(vol.Coerce(float), vol.Range(min=0.1, max=10.0)),
                 }
             ),
             errors=errors,
