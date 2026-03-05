@@ -1,6 +1,6 @@
 {
   "domain": "tapo",
-  "name": "Tapo S200B Listener",
+  "name": "Tapo S200B/S200D Listener",
   "codeowners": ["@identity-labs"],
   "config_flow": true,
   "dependencies": [],
@@ -8,7 +8,7 @@
   "integration_type": "hub",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/identity-labs/ha-tapo/issues",
-  "requirements": ["tapo>=0.8.0"],
-  "version": "1.0.0"
+  "requirements": ["tapo>=0.8.11"],
+  "version": "1.1.0"
 }
 

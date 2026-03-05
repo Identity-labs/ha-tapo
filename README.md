@@ -1,13 +1,13 @@
 # Tapo Home Assistant Integration
 
-Home Assistant custom component for TP-Link Tapo devices, with support for S200B smart button sensors and button press/rotation events.
+Home Assistant custom component for TP-Link Tapo devices, with support for S200B and S200D smart button sensors and button press/rotation events.
 
 ## Features
 
-- ✅ Support for Tapo S200B smart button devices
+- ✅ Support for Tapo S200B and S200D smart button devices
 - ✅ **Button click detection** - Detects single and double clicks
 - ✅ **Rotation detection** - Detects left and right rotations with degrees
-- ✅ **Multiple device support** - Supports multiple S200B devices on the same hub
+- ✅ **Multiple device support** - Supports multiple S200B/S200D devices on the same hub
 - ✅ Battery status monitoring
 - ✅ Device information sensors (model, firmware version, MAC address, signal strength, etc.)
 - ✅ Local polling (no cloud required)
@@ -50,24 +50,24 @@ Home Assistant custom component for TP-Link Tapo devices, with support for S200B
 4. Enter your Tapo account credentials:
    - **Username**: Your Tapo account email/username (case-sensitive)
    - **Password**: Your Tapo account password (case-sensitive)
-   - **Host**: IP address of your Tapo Hub (H100) - S200B devices are connected via the hub
+   - **Host**: IP address of your Tapo Hub (H100) - S200B/S200D devices are connected via the hub
 
 **Important Notes**:
-- The IP address should be your **Tapo Hub (H100)**, not the S200B device itself
-- S200B devices communicate through the hub
+- The IP address should be your **Tapo Hub (H100)**, not the S200B/S200D device itself
+- S200B/S200D devices communicate through the hub
 - Use the exact credentials from your Tapo app (case-sensitive)
 - Make sure your Home Assistant instance can reach the hub on your local network
 
 ## Supported Devices
 
-- **S200B Smart Button**
-  - Supports multiple S200B devices connected to the same hub
+- **S200B/S200D Smart Button**
+  - Supports multiple S200B/S200D devices connected to the same hub
   - Each device gets its own sensors and button event detection
   - Each device is identified by its unique `device_id`
 
 ## Sensors
 
-Each S200B device creates the following sensors:
+Each S200B/S200D device creates the following sensors:
 
 ### Device Information Sensors
 - **Battery** - Battery percentage (0-100%)
@@ -94,7 +94,7 @@ Each S200B device creates the following sensors:
 
 ## Button Events
 
-The integration detects button clicks and rotations by polling the trigger logs from the S200B device every **1 second**. When a button is pressed or rotated, a Home Assistant event `tapo_button_pressed` is fired.
+The integration detects button clicks and rotations by polling the trigger logs from the S200B/S200D device every **1 second**. When a button is pressed or rotated, a Home Assistant event `tapo_button_pressed` is fired.
 
 ### Event Data Structure
 
@@ -102,7 +102,7 @@ All events include:
 - `click_type`: Type of event (`single_click`, `double_click`, `rotate_left`, or `rotate_right`)
 - `event_id`: Unique ID of the event
 - `timestamp`: Unix timestamp of when the button was pressed/rotated
-- `device_id`: Device identifier (allows distinguishing between multiple S200B devices)
+- `device_id`: Device identifier (allows distinguishing between multiple S200B/S200D devices)
 
 Rotation events additionally include:
 - `rotation_degrees`: Absolute value of rotation angle (typically 30° per step)
@@ -119,7 +119,7 @@ Rotation events additionally include:
 
 ## Rotation Events
 
-The S200B button supports rotation events. Each rotation step is typically **30 degrees**.
+The S200B/S200D button supports rotation events. Each rotation step is typically **30 degrees**.
 
 **Rotation Direction**:
 - Positive `rotation_degrees` (e.g., 30) → `rotate_right` (clockwise)
@@ -273,7 +273,7 @@ To find your device ID for device-specific automations:
 1. Go to **Developer Tools** > **Events**
 2. In **"Listen to events"**, type: `tapo_button_pressed`
 3. Click **"Start Listening"**
-4. Press your S200B button
+4. Press your S200B/S200D button
 5. You'll see the event with the `device_id` in the event data
 
 Alternatively, check the attributes of the "Last Button Press" sensor for your device in **Settings** > **Devices & Services**.
@@ -306,12 +306,12 @@ If button presses/rotations are not detected:
      logs:
        custom_components.tapo: debug
    ```
-3. **Verify device pairing**: Ensure the S200B is properly paired with the hub in the Tapo app
+3. **Verify device pairing**: Ensure the S200B/S200D is properly paired with the hub in the Tapo app
 4. **Check polling**: Events are polled every 1 second, so there may be a slight delay
 
 ### Multiple Devices Not Detected
 
-If you have multiple S200B devices but only one is detected:
+If you have multiple S200B/S200D devices but only one is detected:
 
 1. **Check hub**: Ensure all devices are properly paired with the hub
 2. **Restart integration**: Reload the Tapo integration in Home Assistant
@@ -327,7 +327,7 @@ If you have multiple S200B devices but only one is detected:
 
 - Home Assistant 2023.1 or later
 - Tapo Python library (installed automatically via `requirements`)
-- Tapo Hub (H100) with S200B devices paired
+- Tapo Hub (H100) with S200B/S200D devices paired
 - Local network access to the Tapo Hub
 
 ## Technical Details

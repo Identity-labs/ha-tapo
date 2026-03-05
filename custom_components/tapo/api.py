@@ -22,7 +22,7 @@ class TapoAPI:
         self._client: ApiClient | None = None
         self._hub: Any | None = None
         self._device: Any | None = None
-        self._s200b_handler: Any | None = None
+        self._s200_handler: Any | None = None
         self._device_id: str | None = None
         self._authenticated = False
         self._last_successful_auth_time: datetime | None = None
@@ -35,7 +35,7 @@ class TapoAPI:
             
             child_devices = await hub.get_child_device_list()
             if not child_devices:
-                _LOGGER.warning("No child devices found on hub. S200B may need to be paired.")
+                _LOGGER.warning("No child devices found on hub. S200B or S200D may need to be paired.")
                 return False
             
             self._device = child_devices[0]
@@ -44,10 +44,10 @@ class TapoAPI:
             
             if self._device_id:
                 try:
-                    self._s200b_handler = await hub.s200b(self._device_id)
-                    _LOGGER.debug("S200B handler created for device %s", self._device_id)
+                    self._s200_handler = await hub.s200(self._device_id)
+                    _LOGGER.debug("S200B/S200D handler created for device %s", self._device_id)
                 except Exception as err:
-                    _LOGGER.warning("Could not create S200B handler: %s", err)
+                    _LOGGER.warning("Could not create S200B/S200D handler: %s", err)
             
             self._authenticated = True
             self._last_successful_auth_time = datetime.now()
@@ -280,7 +280,7 @@ class TapoAPI:
     async def async_get_trigger_logs(
         self, device_id: str | None = None, page_size: int = 20, start_id: int = 0
     ) -> dict[str, Any] | None:
-        """Get trigger logs from S200B device - contains button click events.
+        """Get trigger logs from S200B/S200D device - contains button click events.
         
         Args:
             page_size: Number of log entries to retrieve (default: 20)
@@ -298,11 +298,11 @@ class TapoAPI:
         try:
             target_device_id = device_id or self._device_id
             if not target_device_id or not self._hub:
-                _LOGGER.warning("S200B handler not available (device_id: %s)", target_device_id)
+                _LOGGER.warning("S200B/S200D handler not available (device_id: %s)", target_device_id)
                 return None
             
-            s200b_handler = await self._hub.s200b(target_device_id)
-            trigger_logs = await s200b_handler.get_trigger_logs(
+            s200_handler = await self._hub.s200(target_device_id)
+            trigger_logs = await s200_handler.get_trigger_logs(
                 page_size=page_size, start_id=start_id
             )
             
@@ -325,15 +325,15 @@ class TapoAPI:
                 )
                 self._authenticated = False
                 self._hub = None
-                self._s200b_handler = None
+                self._s200_handler = None
                 
                 if await self.async_authenticate():
                     _LOGGER.info("Re-authentication successful, retrying trigger logs request...")
                     try:
                         target_device_id = device_id or self._device_id
                         if target_device_id and self._hub:
-                            s200b_handler = await self._hub.s200b(target_device_id)
-                            trigger_logs = await s200b_handler.get_trigger_logs(
+                            s200_handler = await self._hub.s200(target_device_id)
+                            trigger_logs = await s200_handler.get_trigger_logs(
                                 page_size=page_size, start_id=start_id
                             )
                             
@@ -357,7 +357,7 @@ class TapoAPI:
     async def async_close(self) -> None:
         self._authenticated = False
         self._device = None
-        self._s200b_handler = None
+        self._s200_handler = None
         self._hub = None
         self._client = None
 
