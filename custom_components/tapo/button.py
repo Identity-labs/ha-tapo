@@ -30,6 +30,7 @@ class TapoButtonCoordinator(DataUpdateCoordinator):
         self.device_id = device_id
         self._last_processed_id: int | None = None
         self._last_successful_update_time: datetime | None = None
+        self._reported_unavailable = False
 
     def get_last_successful_update_time(self) -> datetime | None:
         return self._last_successful_update_time
@@ -39,8 +40,17 @@ class TapoButtonCoordinator(DataUpdateCoordinator):
         try:
             trigger_logs = await self.api.async_get_trigger_logs(device_id=self.device_id, page_size=10, start_id=0)
             if trigger_logs is None:
-                _LOGGER.warning("Failed to get trigger logs, returning empty dict")
+                if not self._reported_unavailable:
+                    _LOGGER.warning(
+                        "Failed to get trigger logs for %s; further failures are logged at debug until it recovers",
+                        self.device_id,
+                    )
+                    self._reported_unavailable = True
+                else:
+                    _LOGGER.debug("Trigger logs still unavailable for %s", self.device_id)
                 return {"logs": [], "new_events": [], "last_event": None}
+
+            self._reported_unavailable = False
 
             logs = trigger_logs.get("logs", [])
             new_events: list[dict[str, Any]] = []
