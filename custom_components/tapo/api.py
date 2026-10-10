@@ -13,6 +13,7 @@ from .const import AUTH_RETRY_SECONDS
 _LOGGER = logging.getLogger(__name__)
 
 _S200_EVENT_NAMES = ("SingleClick", "DoubleClick", "Rotation", "LowBattery")
+_SUPPORTED_BUTTON_MODELS = {"S200B", "S200D"}
 
 
 def _click_type_from_entry(log_entry: Any) -> str:
@@ -101,6 +102,33 @@ class TapoAPI:
         self._auth_retry_monotonic = 0.0
         self._auth_failure_logged = False
 
+    @staticmethod
+    def _is_supported_button_device(device: Any) -> bool:
+        """Return True only for S200B and S200D buttons."""
+        model_values: list[str] = []
+
+        for attribute in ("model", "device_model", "type", "device_type"):
+            value = getattr(device, attribute, None)
+            if value is not None:
+                model_values.append(str(value))
+
+        to_dict = getattr(device, "to_dict", None)
+        if callable(to_dict):
+            try:
+                device_data = to_dict()
+            except Exception:
+                device_data = None
+            if isinstance(device_data, dict):
+                for key in ("model", "device_model", "type", "device_type"):
+                    value = device_data.get(key)
+                    if value is not None:
+                        model_values.append(str(value))
+
+        return any(value.upper().strip() in _SUPPORTED_BUTTON_MODELS for value in model_values)
+
+    def _supported_button_devices(self, child_devices: list[Any]) -> list[Any]:
+        return [device for device in child_devices if self._is_supported_button_device(device)]
+
     def _clear_session(self) -> None:
         self._authenticated = False
         self._client = None
@@ -154,7 +182,15 @@ class TapoAPI:
                     self._clear_session()
                     return False
 
-                self._device = child_devices[0]
+                supported_devices = self._supported_button_devices(child_devices)
+                if not supported_devices:
+                    _LOGGER.warning(
+                        "No supported S200B/S200D devices found on the hub. Skipping setup for non-button devices."
+                    )
+                    self._clear_session()
+                    return False
+
+                self._device = supported_devices[0]
                 self._device_id = self._device.device_id if hasattr(self._device, "device_id") else None
                 self._hub = hub
 
@@ -171,7 +207,10 @@ class TapoAPI:
                 if self._auth_failure_logged:
                     _LOGGER.info("Authentication succeeded after a previous failure")
                     self._auth_failure_logged = False
-                _LOGGER.debug("Authentication successful, found %d child device(s)", len(child_devices))
+                _LOGGER.debug(
+                    "Authentication successful, found %d supported S200B/S200D device(s)",
+                    len(supported_devices),
+                )
                 return True
             except Exception as err:
                 self._register_auth_failure(err)
@@ -232,8 +271,12 @@ class TapoAPI:
             child_devices = await self._hub.get_child_device_list()
             if not child_devices:
                 return None
-            
-            current_device = child_devices[0]
+
+            supported_devices = self._supported_button_devices(child_devices)
+            if not supported_devices:
+                return None
+
+            current_device = supported_devices[0]
             return self._extract_device_data(current_device)
         except Exception as err:
             _LOGGER.error("Failed to get device info: %s", err, exc_info=True)
@@ -254,8 +297,12 @@ class TapoAPI:
             child_devices = await self._hub.get_child_device_list()
             if not child_devices:
                 return None
-            
-            current_device = child_devices[0]
+
+            supported_devices = self._supported_button_devices(child_devices)
+            if not supported_devices:
+                return None
+
+            current_device = supported_devices[0]
             device_data = self._extract_device_data(current_device)
             result: dict[str, Any] = {}
             
@@ -273,7 +320,7 @@ class TapoAPI:
             return None
 
     async def async_get_all_child_devices(self) -> list[dict[str, Any]] | None:
-        """Get all child devices from the hub."""
+        """Get only supported S200B/S200D child devices from the hub."""
         if not self._authenticated or not self._hub:
             _LOGGER.debug("Not authenticated, authenticating...")
             if not await self.async_authenticate():
@@ -292,6 +339,13 @@ class TapoAPI:
             
             devices_data = []
             for device in child_devices:
+                if not self._is_supported_button_device(device):
+                    _LOGGER.debug(
+                        "Skipping unsupported child device: %s",
+                        getattr(device, "device_id", "unknown"),
+                    )
+                    continue
+
                 device_data = self._extract_device_data(device)
                 if device_data:
                     devices_data.append(device_data)
@@ -302,7 +356,7 @@ class TapoAPI:
             return None
 
     async def async_get_sensor_data(self, device_id: str | None = None) -> dict[str, Any] | None:
-        """Get sensor data for a specific device or the first device if device_id is None."""
+        """Get sensor data for a supported S200B/S200D device."""
         if not self._authenticated or not self._hub:
             _LOGGER.debug("Not authenticated, authenticating...")
             if not await self.async_authenticate():
@@ -318,18 +372,23 @@ class TapoAPI:
             if not child_devices:
                 _LOGGER.warning("No child devices found")
                 return None
-            
+
+            supported_devices = self._supported_button_devices(child_devices)
+            if not supported_devices:
+                _LOGGER.warning("No supported S200B/S200D devices found")
+                return None
+
             if device_id:
-                for device in child_devices:
+                for device in supported_devices:
                     if hasattr(device, "device_id") and device.device_id == device_id:
                         device_data = self._extract_device_data(device)
                         return device_data if device_data else None
                 _LOGGER.warning("Device %s not found", device_id)
                 return None
-            else:
-                current_device = child_devices[0]
-                device_data = self._extract_device_data(current_device)
-                return device_data if device_data else None
+
+            current_device = supported_devices[0]
+            device_data = self._extract_device_data(current_device)
+            return device_data if device_data else None
         except Exception as err:
             _LOGGER.error("Failed to get sensor data: %s", err, exc_info=True)
             return None
