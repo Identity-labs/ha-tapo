@@ -6,6 +6,7 @@ from homeassistant.core import HomeAssistant
 
 from .api import TapoAPI
 from .const import DOMAIN
+from .entity import async_ensure_hub_device
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
@@ -20,9 +21,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     
     await api.async_authenticate()
-    
+    api.set_hub_info(await api.async_get_hub_info())
+
     hass.data[DOMAIN][entry.entry_id] = {"api": api}
-    
+
+    # via_device_id is a registry id, so the hub must exist before child
+    # button devices that connect through it are added.
+    async_ensure_hub_device(hass, api, entry)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
     return True

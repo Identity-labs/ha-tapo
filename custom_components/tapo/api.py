@@ -101,6 +101,25 @@ class TapoAPI:
         self._auth_lock = asyncio.Lock()
         self._auth_retry_monotonic = 0.0
         self._auth_failure_logged = False
+        self._hub_info: dict[str, Any] = {}
+
+    def set_hub_info(self, info: dict[str, Any] | None) -> None:
+        """Remember hub identity used to register the parent device."""
+        self._hub_info = info or {}
+
+    @property
+    def hub_info(self) -> dict[str, Any]:
+        """Return the last hub identity payload, possibly empty."""
+        return self._hub_info
+
+    @property
+    def hub_identifier(self) -> str:
+        """Stable id for the H100: device id when known, otherwise its IP."""
+        for key in ("device_id", "deviceId"):
+            value = self._hub_info.get(key)
+            if value:
+                return str(value)
+        return self.host
 
     @staticmethod
     def _is_supported_button_device(device: Any) -> bool:
@@ -256,6 +275,24 @@ class TapoAPI:
                 pass
         
         return result
+
+    async def async_get_hub_info(self) -> dict[str, Any] | None:
+        """Return identity for the H100 so it can be the parent device."""
+        if not self._authenticated or not self._hub:
+            _LOGGER.debug("Not authenticated, authenticating...")
+            if not await self.async_authenticate():
+                _LOGGER.debug("Authentication unavailable, cannot get hub info")
+                return None
+
+        try:
+            if not self._hub or not hasattr(self._hub, "get_device_info"):
+                return None
+            info = await self._hub.get_device_info()
+            data = self._extract_device_data(info)
+            return data or None
+        except Exception as err:
+            _LOGGER.warning("Failed to get hub device info: %s", err)
+            return None
 
     async def async_get_device_info(self) -> dict[str, Any] | None:
         if not self._authenticated or not self._hub:
