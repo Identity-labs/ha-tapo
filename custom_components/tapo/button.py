@@ -135,6 +135,7 @@ class TapoButtonCoordinator(DataUpdateCoordinator):
 class TapoButtonSensor(TapoChildEntity, SensorEntity):
     _attr_translation_key = "last_button_press"
     _attr_icon = "mdi:gesture-tap-button"
+    _unrecorded_attributes = frozenset({"last_successful_update"})
 
     def __init__(
         self,

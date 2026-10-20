@@ -184,6 +184,9 @@ class TapoCoordinator(DataUpdateCoordinator):
 
 
 class TapoSensor(TapoChildEntity, SensorEntity):
+    _unrecorded_attributes = frozenset(
+        {"last_successful_update", "last_successful_auth"}
+    )
     def __init__(
         self,
         coordinator: DataUpdateCoordinator,
