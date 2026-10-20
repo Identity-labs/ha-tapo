@@ -6,14 +6,13 @@ import logging
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-)
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .api import TapoAPI
 from .const import DOMAIN
+from .entity import TapoChildEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -133,18 +132,19 @@ class TapoButtonCoordinator(DataUpdateCoordinator):
             _LOGGER.info("Fired button event for device %s: %s (ID: %s)", self.device_id, event_type, event_id)
 
 
-class TapoButtonSensor(CoordinatorEntity, SensorEntity):
+class TapoButtonSensor(TapoChildEntity, SensorEntity):
+    _attr_translation_key = "last_button_press"
+    _attr_icon = "mdi:gesture-tap-button"
+
     def __init__(
         self,
         coordinator: TapoButtonCoordinator,
-        config_entry_id: str,
-        device_id: str,
-        device_nickname: str,
+        entry: ConfigEntry,
+        api: TapoAPI,
+        device: dict[str, Any],
     ) -> None:
-        super().__init__(coordinator)
-        self._device_id = device_id
-        self._attr_name = f"{device_nickname} Last Button Press"
-        self._attr_unique_id = f"{config_entry_id}_{device_id}_last_button_press"
+        super().__init__(coordinator, entry, api, device)
+        self._attr_unique_id = f"{entry.entry_id}_{self._device_id}_last_button_press"
 
     @property
     def native_value(self) -> str | None:

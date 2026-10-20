@@ -1,23 +1,101 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import PERCENTAGE, SIGNAL_STRENGTH_DECIBELS_MILLIWATT, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
-)
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .api import TapoAPI
+from .button import TapoButtonCoordinator, TapoButtonSensor
 from .const import CONF_EVENT_POLL_INTERVAL, DEFAULT_EVENT_POLL_INTERVAL, DOMAIN
+from .entity import TapoChildEntity
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class _SensorSpec:
+    key: str
+    translation_key: str
+    unit: str | None = None
+    state_class: SensorStateClass | None = None
+    device_class: SensorDeviceClass | None = None
+    entity_category: EntityCategory | None = None
+    icon: str | None = None
+
+
+_SENSOR_SPECS: tuple[_SensorSpec, ...] = (
+    _SensorSpec(
+        "battery_percentage",
+        "battery",
+        PERCENTAGE,
+        SensorStateClass.MEASUREMENT,
+        SensorDeviceClass.BATTERY,
+    ),
+    _SensorSpec("battery_low", "battery_low", icon="mdi:battery-alert"),
+    _SensorSpec(
+        "model",
+        "model",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:information-outline",
+    ),
+    _SensorSpec(
+        "firmware_version",
+        "firmware_version",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:chip",
+    ),
+    _SensorSpec(
+        "hardware_version",
+        "hardware_version",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:chip",
+    ),
+    _SensorSpec(
+        "nickname",
+        "nickname",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:rename-box",
+    ),
+    _SensorSpec(
+        "mac",
+        "mac",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:network",
+    ),
+    _SensorSpec(
+        "device_id",
+        "device_id",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        icon="mdi:identifier",
+    ),
+    _SensorSpec(
+        "rssi",
+        "rssi",
+        SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+        SensorStateClass.MEASUREMENT,
+        SensorDeviceClass.SIGNAL_STRENGTH,
+    ),
+    _SensorSpec(
+        "signal_level",
+        "signal_level",
+        state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:signal",
+    ),
+    _SensorSpec("at_low_battery", "at_low_battery", icon="mdi:battery-alert-variant-outline"),
+)
 
 
 async def async_setup_entry(
@@ -54,154 +132,19 @@ async def async_setup_entry(
         _LOGGER.debug("Sensor setup for device %s: sensors data = %s", device_id, sensors_data)
         
         if sensors_data:
-            if "battery_percentage" in sensors_data:
-                sensors.append(
-                    TapoSensor(
-                        coordinator,
-                        entry.entry_id,
-                        device_id,
-                        "battery_percentage",
-                        f"{device_nickname} Battery",
-                        "%",
-                        SensorStateClass.MEASUREMENT,
-                    )
-                )
-            
-            if "battery_low" in sensors_data:
-                sensors.append(
-                    TapoSensor(
-                        coordinator,
-                        entry.entry_id,
-                        device_id,
-                        "battery_low",
-                        f"{device_nickname} Battery Low",
-                        None,
-                        None,
-                    )
-                )
-            
-            if "model" in sensors_data:
-                sensors.append(
-                    TapoSensor(
-                        coordinator,
-                        entry.entry_id,
-                        device_id,
-                        "model",
-                        f"{device_nickname} Model",
-                        None,
-                        None,
-                    )
-                )
-            
-            if "firmware_version" in sensors_data:
-                sensors.append(
-                    TapoSensor(
-                        coordinator,
-                        entry.entry_id,
-                        device_id,
-                        "firmware_version",
-                        f"{device_nickname} Firmware Version",
-                        None,
-                        None,
-                    )
-                )
-            
-            if "hardware_version" in sensors_data:
-                sensors.append(
-                    TapoSensor(
-                        coordinator,
-                        entry.entry_id,
-                        device_id,
-                        "hardware_version",
-                        f"{device_nickname} Hardware Version",
-                        None,
-                        None,
-                    )
-                )
-            
-            if "nickname" in sensors_data:
-                sensors.append(
-                    TapoSensor(
-                        coordinator,
-                        entry.entry_id,
-                        device_id,
-                        "nickname",
-                        f"{device_nickname} Nickname",
-                        None,
-                        None,
-                    )
-                )
-            
-            if "mac" in sensors_data:
-                sensors.append(
-                    TapoSensor(
-                        coordinator,
-                        entry.entry_id,
-                        device_id,
-                        "mac",
-                        f"{device_nickname} MAC Address",
-                        None,
-                        None,
-                    )
-                )
-            
-            if "device_id" in sensors_data:
-                sensors.append(
-                    TapoSensor(
-                        coordinator,
-                        entry.entry_id,
-                        device_id,
-                        "device_id",
-                        f"{device_nickname} Device ID",
-                        None,
-                        None,
-                    )
-                )
-            
-            if "rssi" in sensors_data:
-                sensors.append(
-                    TapoSensor(
-                        coordinator,
-                        entry.entry_id,
-                        device_id,
-                        "rssi",
-                        f"{device_nickname} Signal Strength (RSSI)",
-                        "dBm",
-                        SensorStateClass.MEASUREMENT,
-                    )
-                )
-            
-            if "signal_level" in sensors_data:
-                sensors.append(
-                    TapoSensor(
-                        coordinator,
-                        entry.entry_id,
-                        device_id,
-                        "signal_level",
-                        f"{device_nickname} Signal Level",
-                        None,
-                        SensorStateClass.MEASUREMENT,
-                    )
-                )
-            
-            if "at_low_battery" in sensors_data:
-                sensors.append(
-                    TapoSensor(
-                        coordinator,
-                        entry.entry_id,
-                        device_id,
-                        "at_low_battery",
-                        f"{device_nickname} Low Battery Warning",
-                        None,
-                        None,
-                    )
-                )
-            
-            from .button import TapoButtonCoordinator, TapoButtonSensor
-            poll_interval = entry.options.get(CONF_EVENT_POLL_INTERVAL) or entry.data.get(CONF_EVENT_POLL_INTERVAL, DEFAULT_EVENT_POLL_INTERVAL)
-            button_coordinator = TapoButtonCoordinator(hass, api, device_id, poll_interval=poll_interval)
-            await button_coordinator.async_config_entry_first_refresh()
-            sensors.append(TapoButtonSensor(button_coordinator, entry.entry_id, device_id, device_nickname))
+            for spec in _SENSOR_SPECS:
+                if spec.key not in sensors_data:
+                    continue
+                sensors.append(TapoSensor(coordinator, entry, api, device_data, spec))
+
+        poll_interval = entry.options.get(CONF_EVENT_POLL_INTERVAL) or entry.data.get(
+            CONF_EVENT_POLL_INTERVAL, DEFAULT_EVENT_POLL_INTERVAL
+        )
+        button_coordinator = TapoButtonCoordinator(
+            hass, api, device_id, poll_interval=poll_interval
+        )
+        await button_coordinator.async_config_entry_first_refresh()
+        sensors.append(TapoButtonSensor(button_coordinator, entry, api, device_data))
 
     _LOGGER.info("Setting up %d sensor entities", len(sensors))
     async_add_entities(sensors)
@@ -240,24 +183,25 @@ class TapoCoordinator(DataUpdateCoordinator):
             return {}
 
 
-class TapoSensor(CoordinatorEntity, SensorEntity):
+class TapoSensor(TapoChildEntity, SensorEntity):
     def __init__(
         self,
         coordinator: DataUpdateCoordinator,
-        config_entry_id: str,
-        device_id: str,
-        sensor_key: str,
-        name: str,
-        unit: str | None,
-        state_class: SensorStateClass | None,
+        entry: ConfigEntry,
+        api: TapoAPI,
+        device: dict[str, Any],
+        spec: _SensorSpec,
     ) -> None:
-        super().__init__(coordinator)
-        self._sensor_key = sensor_key
-        self._device_id = device_id
-        self._attr_name = name
-        self._attr_unique_id = f"{config_entry_id}_{device_id}_{sensor_key}"
-        self._attr_native_unit_of_measurement = unit
-        self._attr_state_class = state_class
+        super().__init__(coordinator, entry, api, device)
+        self._sensor_key = spec.key
+        self._attr_translation_key = spec.translation_key
+        self._attr_unique_id = f"{entry.entry_id}_{self._device_id}_{spec.key}"
+        self._attr_native_unit_of_measurement = spec.unit
+        self._attr_state_class = spec.state_class
+        self._attr_device_class = spec.device_class
+        self._attr_entity_category = spec.entity_category
+        if spec.icon:
+            self._attr_icon = spec.icon
 
     @property
     def native_value(self) -> str | int | float | bool | None:
