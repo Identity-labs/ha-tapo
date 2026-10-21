@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import logging
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -133,9 +133,12 @@ class TapoButtonCoordinator(DataUpdateCoordinator):
 
 
 class TapoButtonSensor(TapoChildEntity, SensorEntity):
-    _attr_translation_key = "last_button_press"
-    _attr_icon = "mdi:gesture-tap-button"
-    _unrecorded_attributes = frozenset({"last_successful_update"})
+    entity_description = SensorEntityDescription(
+        key="last_button_press",
+        translation_key="last_button_press",
+        name="Last button press",
+        icon="mdi:gesture-tap-button",
+    )
 
     def __init__(
         self,
@@ -181,11 +184,6 @@ class TapoButtonSensor(TapoChildEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         attrs: dict[str, Any] = {}
-        
-        if hasattr(self.coordinator, "get_last_successful_update_time"):
-            last_update = self.coordinator.get_last_successful_update_time()
-            attrs["last_successful_update"] = last_update.isoformat() if last_update else "Never"
-        
         last_event = self.coordinator.data.get("last_event")
         if last_event:
             timestamp = last_event.get("timestamp")

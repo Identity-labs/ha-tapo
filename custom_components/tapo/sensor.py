@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
 from typing import Any
@@ -9,6 +8,7 @@ from typing import Any
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
+    SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -25,76 +25,84 @@ from .entity import TapoChildEntity
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True, slots=True)
-class _SensorSpec:
-    key: str
-    translation_key: str
-    unit: str | None = None
-    state_class: SensorStateClass | None = None
-    device_class: SensorDeviceClass | None = None
-    entity_category: EntityCategory | None = None
-    icon: str | None = None
-
-
-_SENSOR_SPECS: tuple[_SensorSpec, ...] = (
-    _SensorSpec(
-        "battery_percentage",
-        "battery",
-        PERCENTAGE,
-        SensorStateClass.MEASUREMENT,
-        SensorDeviceClass.BATTERY,
+_SENSOR_SPECS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key="battery_percentage",
+        translation_key="battery",
+        name="Battery",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.BATTERY,
     ),
-    _SensorSpec("battery_low", "battery_low", icon="mdi:battery-alert"),
-    _SensorSpec(
-        "model",
-        "model",
+    SensorEntityDescription(
+        key="battery_low",
+        translation_key="battery_low",
+        name="Battery low",
+        icon="mdi:battery-alert",
+    ),
+    SensorEntityDescription(
+        key="model",
+        translation_key="model",
+        name="Model",
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:information-outline",
     ),
-    _SensorSpec(
-        "firmware_version",
-        "firmware_version",
+    SensorEntityDescription(
+        key="firmware_version",
+        translation_key="firmware_version",
+        name="Firmware version",
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:chip",
     ),
-    _SensorSpec(
-        "hardware_version",
-        "hardware_version",
+    SensorEntityDescription(
+        key="hardware_version",
+        translation_key="hardware_version",
+        name="Hardware version",
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:chip",
     ),
-    _SensorSpec(
-        "nickname",
-        "nickname",
+    SensorEntityDescription(
+        key="nickname",
+        translation_key="nickname",
+        name="Nickname",
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:rename-box",
     ),
-    _SensorSpec(
-        "mac",
-        "mac",
+    SensorEntityDescription(
+        key="mac",
+        translation_key="mac",
+        name="MAC address",
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:network",
     ),
-    _SensorSpec(
-        "device_id",
-        "device_id",
+    SensorEntityDescription(
+        key="device_id",
+        translation_key="device_id",
+        name="Device ID",
         entity_category=EntityCategory.DIAGNOSTIC,
         icon="mdi:identifier",
     ),
-    _SensorSpec(
-        "rssi",
-        "rssi",
-        SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-        SensorStateClass.MEASUREMENT,
-        SensorDeviceClass.SIGNAL_STRENGTH,
+    SensorEntityDescription(
+        key="rssi",
+        translation_key="rssi",
+        name="Signal strength",
+        native_unit_of_measurement=SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
     ),
-    _SensorSpec(
-        "signal_level",
-        "signal_level",
+    SensorEntityDescription(
+        key="signal_level",
+        translation_key="signal_level",
+        name="Signal level",
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:signal",
     ),
-    _SensorSpec("at_low_battery", "at_low_battery", icon="mdi:battery-alert-variant-outline"),
+    SensorEntityDescription(
+        key="at_low_battery",
+        translation_key="at_low_battery",
+        name="Low battery warning",
+        icon="mdi:battery-alert-variant-outline",
+    ),
 )
 
 
@@ -184,27 +192,18 @@ class TapoCoordinator(DataUpdateCoordinator):
 
 
 class TapoSensor(TapoChildEntity, SensorEntity):
-    _unrecorded_attributes = frozenset(
-        {"last_successful_update", "last_successful_auth"}
-    )
     def __init__(
         self,
         coordinator: DataUpdateCoordinator,
         entry: ConfigEntry,
         api: TapoAPI,
         device: dict[str, Any],
-        spec: _SensorSpec,
+        description: SensorEntityDescription,
     ) -> None:
         super().__init__(coordinator, entry, api, device)
-        self._sensor_key = spec.key
-        self._attr_translation_key = spec.translation_key
-        self._attr_unique_id = f"{entry.entry_id}_{self._device_id}_{spec.key}"
-        self._attr_native_unit_of_measurement = spec.unit
-        self._attr_state_class = spec.state_class
-        self._attr_device_class = spec.device_class
-        self._attr_entity_category = spec.entity_category
-        if spec.icon:
-            self._attr_icon = spec.icon
+        self.entity_description = description
+        self._sensor_key = description.key
+        self._attr_unique_id = f"{entry.entry_id}_{self._device_id}_{description.key}"
 
     @property
     def native_value(self) -> str | int | float | bool | None:
@@ -212,18 +211,4 @@ class TapoSensor(TapoChildEntity, SensorEntity):
             value = self.coordinator.data.get(self._sensor_key)
             return value
         return None
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        attrs: dict[str, Any] = {}
-        
-        if hasattr(self.coordinator, "get_last_successful_update_time"):
-            last_update = self.coordinator.get_last_successful_update_time()
-            attrs["last_successful_update"] = last_update.isoformat() if last_update else "Never"
-        
-        if hasattr(self.coordinator, "api") and hasattr(self.coordinator.api, "get_last_successful_auth_time"):
-            last_auth = self.coordinator.api.get_last_successful_auth_time()
-            attrs["last_successful_auth"] = last_auth.isoformat() if last_auth else "Never"
-        
-        return attrs
 

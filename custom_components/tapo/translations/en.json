@@ -1,0 +1,42 @@
+{
+  "entity": {
+    "sensor": {
+      "battery": {
+        "name": "Battery"
+      },
+      "battery_low": {
+        "name": "Battery low"
+      },
+      "model": {
+        "name": "Model"
+      },
+      "firmware_version": {
+        "name": "Firmware version"
+      },
+      "hardware_version": {
+        "name": "Hardware version"
+      },
+      "nickname": {
+        "name": "Nickname"
+      },
+      "mac": {
+        "name": "MAC address"
+      },
+      "device_id": {
+        "name": "Device ID"
+      },
+      "rssi": {
+        "name": "Signal strength"
+      },
+      "signal_level": {
+        "name": "Signal level"
+      },
+      "at_low_battery": {
+        "name": "Low battery warning"
+      },
+      "last_button_press": {
+        "name": "Last button press"
+      }
+    }
+  }
+}
